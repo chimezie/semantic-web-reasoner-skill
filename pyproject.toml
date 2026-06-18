@@ -1,0 +1,29 @@
+[project]
+name = "semantic-web-reasoner-skill"
+version = "1.0.0"
+description = "Python helper scripts for the semantic-web-reasoner skill (OWL_DSL / owlready2 / FuXi)"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+dependencies = [
+    "owlready2",
+    "rdflib",
+    "fuxi",
+]
+
+[dependency-groups]
+dev = [
+    "ruff",
+]
+
+[tool.uv]
+package = false
+
+# `fuxi` is provided by the sibling FuXi-reincarnate checkout. For local
+# development / PyCharm the editable path source is used; remove or override
+# this block to resolve `fuxi` from PyPI instead.
+[tool.uv.sources]
+fuxi = { path = "..", editable = true }
+
+[tool.ruff]
+target-version = "py313"
