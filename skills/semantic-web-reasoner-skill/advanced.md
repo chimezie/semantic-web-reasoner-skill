@@ -21,23 +21,34 @@ The main distinction is passing False to `identify_hybrid_predicates` and, when 
 
 Otherwise, you can still pass additional rules, etc.
 
-**Auto-derivation (recommended)**: Omit `derived_predicates` and `hybrid_predicates` — FuXi's `TopDownSPARQLEntailingStore` auto-discovers derived predicates from rule heads:
+**Auto-derivation (recommended)**: Omit `derived_predicates` and `hybrid_predicates` — FuXi's `TopDownSPARQLEntailingStore` auto-discovers derived predicates from rule heads. For remote endpoints with large datasets, always use `tbox_only_graph` to keep DLP compilation local:
 
 ```python
 from fuxi.SPARQL.service import SPARQLServiceGraph
 from fuxi.SPARQL.utilities import sparql_interlocution, owl_entailment_regime_graph
+from rdflib import Graph
+
+# Load TBox locally for DLP compilation
+tbox_graph = Graph()
+tbox_graph.parse("imdb.owl")
 
 remote_graph = SPARQLServiceGraph("http://localhost:7000")
+remote_graph.namespace_manager = tbox_graph.namespace_manager
 
 entailing_graph, _ = owl_entailment_regime_graph(
     remote_graph,
-    ns_map={"ex": EX},
+    ns_map={"ex": EX, "imdb": "https://www.imdb.com/"},
+    tbox_only_graph=tbox_graph,
     extra_rulesets=program,
     # derived_predicates and hybrid_predicates omitted → auto-derived
 )
 
+# Query via sparql_interlocution or .query() directly:
 for answer in sparql_interlocution(" .. sparql query ..", entailing_graph.store):
-    #Entailed answers
+    pass
+
+for row in entailing_graph.query(" .. sparql query .."):
+    print(row)
 ```
 
 **Manual override** (when you need to restrict the set):
@@ -46,6 +57,7 @@ for answer in sparql_interlocution(" .. sparql query ..", entailing_graph.store)
 entailing_graph, _ = owl_entailment_regime_graph(
     remote_graph,
     ns_map={"ex": EX},
+    tbox_only_graph=tbox_graph,
     derived_predicates=[EX.Movie, EX.film_director],
     extra_rulesets=program,
 )

@@ -100,6 +100,15 @@ ns_map = {
 }
 ```
 
+### Query API: `sparql_interlocution` vs `entailing_graph.query()`
+
+The entailing graph produced by `owl_entailment_regime_graph` wraps the `TopDownSPARQLEntailingStore` in a standard `rdflib.Graph`. This means you can use **either** of two query APIs:
+
+1. **`sparql_interlocution(query_str, entailing_graph.store)`** — yields `dict[Variable, RDFTerm]` per solution. More convenient for programmatic use (each answer is a dict keyed by Variable).
+2. **`entailing_graph.query(query_str)`** — returns `rdflib.query.Result` (standard rdflib API). Iterates as `ResultRow` objects. Works identically to any other `rdflib.Graph.query()` call.
+
+Both APIs resolve derived predicates through the same backward-chaining engine. Choose based on whether you prefer dict-style or row-style access.
+
 ### PyPI note
 
 The `sparql-interlocution` tool wraps the Python API function `sparql_interlocution(query, top_down_store)`. The Python function takes a SPARQL string and a `TopDownSPARQLEntailingStore` (produced by `owl_entailment_regime_graph`). The tool handles the setup of `SPARQLServiceGraph` + `owl_entailment_regime_graph` for you.
@@ -109,8 +118,8 @@ Arguments:
 - `sparqlServiceGraph` (required): URL of the SPARQL endpoint to query (e.g. `http://localhost:7000/`).
 - `nsBindings` (required): JSON object mapping prefixes to namespace URIs.
 - `query` (required): The SPARQL query string to execute.
-- `owlFile` (optional): Path to an OWL file for the TBox ontology.
-- `rulesFile` (optional): Path to an N3 rules file for custom entailment rules.
+- `owlFile` (optional): Path to an OWL file for the TBox ontology. **Strongly recommended** for large endpoints — DLP compilation runs locally against the OWL file instead of querying the remote endpoint for schema introspection.
+- `rulesFile` (optional): Path to an N3 rules file for custom entailment rules. Rule heads are automatically scanned for derived predicates.
 - `hybridPredicates` (optional): JSON array of hybrid predicate URIs. When omitted, hybrid predicates are auto-detected if `identify_hybrid_predicates` is True (scans for predicates in both EDB and rule heads).
 - `derivedPredicates` (optional): JSON array of derived predicate URIs — answered via backward-chaining over the rule program. **When omitted**, predicates are auto-derived by `derived_predicate_iterator` which scans rule heads in the combined OWL DLP rules + N3 rules + OWL 2 RL semantics. Pass an empty array `[]` to suppress all derivation.
 

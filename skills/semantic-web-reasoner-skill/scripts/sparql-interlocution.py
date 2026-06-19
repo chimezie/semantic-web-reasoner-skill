@@ -94,7 +94,6 @@ def main():
         extra_rulesets=program or None,
         tbox_only_graph=tbox_graph,
         add_pd_semantics=False,
-        add_non_dhl_owl_rules=True,
         namespace_manager=ns_graph.namespace_manager,
     )
 
