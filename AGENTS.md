@@ -1,6 +1,6 @@
 # Semantic Web Reasoner Skill — Agent Guide
 
-An [OpenCode](https://opencode.ai) skill providing ontology management tools (check, create, verbalize, reason over OWL ontologies).
+An [OpenCode](https://opencode.ai) skill providing semantic web ontology and rule management tools and awareness (check, create, verbalize, reason over OWL ontologies).
 
 ---
 

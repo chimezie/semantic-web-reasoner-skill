@@ -1,4 +1,6 @@
-The `sparql_interlocution` method facilitates SPARQL entailment. It takes a SPARQL query string and a `TopDownSPARQLEntailingStore` as arguments, and yields solution dictionaries.
+An `owl_entailment_regime_graph` (from `fuxi.SPARQL.utilities.owl_entailment_regime_graph`) has a `query` method that can be used to ask SPARQL queries subject to entailment (OWL, N3, W3C RIF, etc.)
+
+It takes a SPARQL query string and yields instances of `rdflib.query.Result`.
 
 ### Local Graph (all-in-memory)
 
@@ -12,12 +14,9 @@ fact_graph = Graph().parse("ontology.ttl")
 entailing_graph, _ = owl_entailment_regime_graph(
     fact_graph,
     # derived_predicates omitted → auto-derived from rule heads
-    add_pd_semantics = False,
-    add_non_dhl_owl_rules = True,
+    add_pd_semantics = False
 )
-for answer in sparql_interlocution(" .. sparql query ..", entailing_graph.store):
-    answer: dict[Variable, RDFTerm]
-    user_readable_dict = {f"?{k} -> {v.n3()}" for k, v in answer.items()}
+for answer in entailing_graph.query(" .. sparql query .."):
     # Use answers in subsequent query, etc.
 ```
 
@@ -28,7 +27,7 @@ for answer in sparql_interlocution(" .. sparql query ..", entailing_graph.store)
 When the instance data lives behind a remote SPARQL endpoint (e.g., QLever, Virtuoso, Blazegraph), the TBox (OWL schema) should be loaded locally for DLP compilation. The `sparql-interlocution` tool does this automatically when `owlFile` is provided: it uses the local OWL file for description logic programming (classes, properties, domain/range axioms) and the remote endpoint as the EDB for instance queries only.
 
 ```python
-from fuxi.SPARQL.utilities import sparql_interlocution, owl_entailment_regime_graph
+from fuxi.SPARQL.utilities import owl_entailment_regime_graph
 from fuxi.types import Variable, RDFTerm
 from fuxi.SPARQL.service import SPARQLServiceGraph 
 from rdflib import Graph
@@ -56,11 +55,8 @@ entailing_graph, _ = owl_entailment_regime_graph(
     tbox_only_graph=tbox_graph,
     extra_rulesets=n3_rules,
     add_pd_semantics=False,
-    add_non_dhl_owl_rules=True,
 )
-for answer in sparql_interlocution(" .. sparql query ..", entailing_graph.store):
-    answer: dict[Variable, RDFTerm]
-    user_readable_dict = {f"?{k} -> {v.n3()}" for k, v in answer.items()}
+for answer in entailing_graph.query(" .. sparql query .."):
     # Use answers in subsequent query, etc.
 ```
 
