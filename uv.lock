@@ -1834,7 +1834,7 @@ wheels = [
 ]
 
 [[package]]
-name = "semantic-web-reasoner-skill"
+name = "semantic-web-agent"
 version = "1.0.0"
 source = { virtual = "." }
 dependencies = [

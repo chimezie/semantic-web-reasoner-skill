@@ -1,8 +1,8 @@
-# Semantic Web Reasoner Skill
+# Semantic Web Agent
 An OpenCode / Claude skill for Semantic Web (SW) architecture and development using tool-aware LLMs and VLM, and taking full 
 advantage of reasoners and SW tools such as FuXi, robot, riot, etc.
 
-See [SKILL.md](skills/semantic-web-reasoner-skill/SKILL.md)
+See [SKILL.md](skills/semantic-web-agent/SKILL.md)
 
 Example of verbalization with the `verbalize-ontology-class` tool, using [owl_dsl](https://github.com/chimezie/owl_dsl)
 to render controlled natural language phrases of an ontology and using this to suggest values for 

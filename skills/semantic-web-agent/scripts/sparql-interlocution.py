@@ -4,7 +4,7 @@
 # dependencies = ["rdflib", "fuxi"]
 # ///
 """
-sparql-interlocution.py — Execute SPARQL queries with OWL entailment via FuXi
+sparql-interlocution.py — Execute SPARQL queries with OWL entailment via FuXi's sparql_interlocution_basic_graph_pattern
 
 Positional arguments:
 1. SPARQL endpoint URL
@@ -12,8 +12,6 @@ Positional arguments:
 3. SPARQL query string
 4. Path to OWL file for TBox (ontology), or "--" for none
 5. Path to N3 rules file, or "--" for none
-6. Hybrid predicates (JSON array of URIs), or "--" for none
-7. Derived predicates (JSON array of URIs), or "--" for none
 """
 import json
 import sys
@@ -21,8 +19,14 @@ from io import StringIO
 from pathlib import Path
 
 from fuxi.Horn.HornRules import horn_from_n3
+from fuxi.Horn.PositiveConditions import build_uniterm_from_tuple
 from fuxi.SPARQL.service import SPARQLServiceGraph
-from fuxi.SPARQL.utilities import owl_entailment_regime_graph, sparql_interlocution
+from fuxi.SPARQL.utilities import (
+    owl_entailment_regime_graph,
+    sparql_interlocution_basic_graph_pattern,
+)
+from fuxi.predicates import SPARQLPredicatePartitioner
+from fuxi.Rete.Proof import TruthMaintenanceGraphSerializer
 from rdflib import Graph, URIRef
 
 
@@ -50,12 +54,6 @@ def main():
     query = sys.argv[3]
     owl_file = sys.argv[4] if len(sys.argv) > 4 and sys.argv[4] not in ("", "--") else None
     rules_file = sys.argv[5] if len(sys.argv) > 5 and sys.argv[5] not in ("", "--") else None
-    hybrid_predicates = []
-    if len(sys.argv) > 6 and sys.argv[6] and sys.argv[6] != "--":
-        hybrid_predicates = [URIRef(hp) for hp in json.loads(sys.argv[6])]
-    derived_predicates = None
-    if len(sys.argv) > 7 and sys.argv[7] and sys.argv[7] != "--":
-        derived_predicates = [URIRef(dp) for dp in json.loads(sys.argv[7])]
 
     ns_map = {k: URIRef(v) for k, v in ns_bindings.items()}
 
@@ -79,36 +77,32 @@ def main():
             rule.ns_mapping.update(ns_bindings)
         program.extend(n3_rules)
 
-    # Merge explicit derived predicates with those from N3 rules (if any).
-    derived_preds = set(derived_predicates) if derived_predicates else set()
-    if rules_file:
-        derived_preds.update(collect_head_predicates(program))
+    entailment_builder = SPARQLPredicatePartitioner(fact_graph,
+                                                    rules = program,
+                                                    identify_hybrid_predicates = True,
+                                                    tbox_only_graph = tbox_graph)
+    entailing_graph = entailment_builder.create_entailing_store(ns_map=ns_map)
 
-
-    entailing_graph, _ = owl_entailment_regime_graph(
-        fact_graph,
-        ns_map=ns_map,
-        identify_hybrid_predicates=False,
-        hybrid_predicates=hybrid_predicates,
-        derived_predicates=list(derived_preds) if derived_preds else None,
-        extra_rulesets=program or None,
-        tbox_only_graph=tbox_graph,
-        add_pd_semantics=False,
-        namespace_manager=ns_graph.namespace_manager,
-    )
-
+    answers, proofs = sparql_interlocution_basic_graph_pattern(query, entailing_graph.store, generate_proofs=True)
     results = []
-    for answer in sparql_interlocution(query, entailing_graph.store):
-        if isinstance(answer, bool):
-            results.append({"type": "boolean", "value": answer})
-        else:
-            row = {}
-            for var, val in answer.items():
-                row[str(var)] = val.n3() if hasattr(val, "n3") else str(val)
-            results.append(row)
-
-    print(json.dumps(results, indent=2))
-
+    for row in answers:
+        out = {}
+        for var in row.vars:
+            val = row[var]
+            out[str(var)] = val.n3() if hasattr(val, "n3") else str(val)
+        results.append(out)
+    response = f"# Results #\n{results}"
+    for (goal,
+         (truth_graph, adorned_program, meta_interp_network, inferred_facts, pf, goal_lit)) in proofs.items():
+        serializer = TruthMaintenanceGraphSerializer(truth_graph, adorned_program, ns_map=ns_map)
+        goal_lit = build_uniterm_from_tuple(goal)
+        for prefix, uri in ns_bindings.items():
+            goal_lit.ns_manager.bind(prefix, uri)
+        response += ("\n= Proof using BFP meta interpreter and compilation of meta rules =\n")
+        response += serializer.human_readable_serialize(pf, goal, as_uniterm=goal_lit, ns_bindings=ns_map)
+        response += "\n"
+        response += serializer.meta_rule_explainer()
+    return response
 
 if __name__ == "__main__":
     main()

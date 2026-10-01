@@ -6,6 +6,10 @@
 """
 create-ontology.py — create OWL_DSL / owlready2 SQLite ontology and archive provenance
 
+Only needed for the reasoner path (class-entailments tool, which uses ELK via owlready2 + owlapy).
+For review/rendering tools (verbalize-ontology-class, find-ontology-class, find-ontology-property),
+pyhornedowl reads the OWL file directly — no SQLite needed.
+
 Positional arguments:
 - ontology URI (ontology_uri): URI of ontology to create (ending with '#' or '/' if there is one)
 - Ontology Base URI (ontology_base_uri): Common URI prefix for terms defined in the ontology

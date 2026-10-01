@@ -1,7 +1,7 @@
 [project]
-name = "semantic-web-reasoner-skill"
+name = "semantic-web-agent"
 version = "1.0.0"
-description = "Python helper scripts for the semantic-web-reasoner skill (OWL_DSL / owlready2 / FuXi)"
+description = "Python helper scripts for the semantic-web-agent skill (OWL_DSL / owlready2 / FuXi)"
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "MIT" }
