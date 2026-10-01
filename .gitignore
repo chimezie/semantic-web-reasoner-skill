@@ -213,3 +213,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 node_modules/
+
+# Keep TypeScript helper sources (packaging lib/ rule above would else ignore src/lib/)
+!src/lib/
+!src/lib/**

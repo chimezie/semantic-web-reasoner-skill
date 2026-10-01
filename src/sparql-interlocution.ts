@@ -6,7 +6,9 @@ import { which } from "bun"
 const TOOLS_DIR = path.join(os.homedir(), ".opencode", "tools")
 
 export default tool({
-  description: "Execute SPARQL queries over a remote endpoint with OWL entailment via FuXi sparql_interlocution",
+  description: "Execute a SPARQL queries over a remote endpoint with OWL entailment via FuXi's sparql_interlocution_basic_graph_pattern" +
+      " against the specified URL, using any provided prefix to Namespace URI mappings, an OWL Ontology, and rules that" +
+      " govern the semantics of the terms in the remote RDF dataset",
   args: {
     sparqlServiceGraph: tool.schema.string().describe("URL of the SPARQL endpoint"),
     nsBindings: tool.schema.string().describe(
@@ -16,13 +18,7 @@ export default tool({
     owlFile: tool.schema.string().optional().describe(
         "Path to an OWL file for the TBox (loaded locally for DLP; SPARQL endpoint serves as EDB only)"),
     rulesFile: tool.schema.string().optional().describe(
-        "Path to an N3 rules file for custom entailment rules"),
-    hybridPredicates: tool.schema.string().optional().describe(
-        "JSON array of hybrid predicate URIs, e.g. '[\"http://example.org/#prop\"]'"),
-    derivedPredicates: tool.schema.string().optional().describe(
-        "JSON array of derived predicate URIs, e.g. '[\"https://www.imdb.com/Movie\"]'. " +
-        "These are the predicates the reasoner will try to prove via backward chaining. " +
-        "Predicates NOT in this list will be queried directly against the SPARQL endpoint."),
+        "Path to an N3 rules file for custom entailment rules")
   },
   async execute(args, context) {
     const script = path.join(TOOLS_DIR, "sparql-interlocution.py")
@@ -33,8 +29,6 @@ export default tool({
       String(args.query),
       args.owlFile ?? "--",
       args.rulesFile ?? "--",
-      args.hybridPredicates ?? "--",
-      args.derivedPredicates ?? "--",
     ]
 
     const useUv = which("uv")

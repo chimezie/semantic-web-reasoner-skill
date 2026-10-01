@@ -6,7 +6,7 @@ import { which } from "bun"
 const TOOLS_DIR = path.join(os.homedir(), ".opencode", "tools")
 
 export default tool({
-  description: "List the terms in an ontology as Manchester OWL",
+  description: "List the terms in an ontology as Manchester OWL (uses owlready2 SQLite; for the reasoner path only)",
   args: {
     sqliteFile: tool.schema.string().describe("Path to SQLite file with pre-loaded ontology"),
   },
