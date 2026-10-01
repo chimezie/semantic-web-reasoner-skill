@@ -1,6 +1,6 @@
 # Semantic Web Agent and Ontology Management Skills
 
-Helper skills and scripts for Semantic Web agent and ontology engineering architecture using Expert system, Linked Data, and basic principles of World Wide Web architecture.
+Helper AI coding and architecture skill and scripts for Semantic Web agent and ontology engineering architecture using principles of Expert systems, Linked Data, and World Wide Web architecture.
 
 Provides two (OpenCode-compatible) Agent skills, plus a medical reasoning [subagent](https://opencode.ai/docs/agents/) and
 [command](https://opencode.ai/docs/commands) for delegating clinical terminology questions to a terminology specialist model instead of reasoning about unfamiliar medical terms directly.
