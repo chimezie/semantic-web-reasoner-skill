@@ -5,6 +5,8 @@ Helper skills and scripts for Semantic Web agent and ontology engineering archit
 Provides two (OpenCode-compatible) Agent skills, plus a medical reasoning [subagent](https://opencode.ai/docs/agents/) and
 [command](https://opencode.ai/docs/commands) for delegating clinical terminology questions to a terminology specialist model instead of reasoning about unfamiliar medical terms directly.
 
+Is opinionated in which tools to use ([OWL_DSL](https://github.com/chimezie/owl_dsl), [ROBOT](https://robot.obolibrary.org/), [Fuxi-reincarnate](https://github.com/chimezie/fuxi-reincarnate), [riot](https://jena.apache.org/documentation/io/)) but provides a comprehensive Semantic Web architecture toolkit.
+
 ## Skills
 
 ### 1. [`semantic-web-agent`](skills/semantic-web-agent/SKILL.md)
