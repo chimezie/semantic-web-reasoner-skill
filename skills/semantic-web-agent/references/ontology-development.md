@@ -2,6 +2,13 @@
 
 ## 1. Construction Strategies
 
+### **Identifier Design (Pre-Construction)**
+Before minting terms, establish a stable naming policy:
+- **Namespace**: Use a dereferenceable base URI (e.g., `http://id.example.org/`).
+- **Local Names**: Use mnemonic, stable local names. Never encode labels or versions in the IRI (e.g., use `ex:Person` not `ex:Person_v1`).
+- **Pattern**: Use **Hash URIs** (`.../ontology#Person`) for compactness and stablity when defining *new* vocabularies.
+- **Documentation**: Every ontology should have a canonical `owl:Ontology` instance with a base URI and ontology IRI (might be the same) and a human-readable label, and other links to documentation via `rdfs:isDefinedBy` or `foaf:page`.
+
 Depending on the scale and complexity of your task, choose one of the following two methods.
 
 ### **Method A: InfixOWL (Idiomatic Development)**
@@ -100,3 +107,4 @@ After construction, always run the following validation sequence:
 
 1.  **`check-ontology`**: Catch OWL syntax and profile (OWL 2 DL) violations.
 2.  **`ontology-measure-essentials`**: Generate a report of essential measures: the number of classes, individuals and properties, axiom counts, the OWL profiles, etc.
+3.  **Dereference Check**: Verify that the ontology's base URI and terms are correctly resolvable via HTTP (e.g., `curl -I <base-uri>` returns 200 or 303).
