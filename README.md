@@ -1,17 +1,37 @@
 # Semantic Web Agent and Ontology Management Skills
 
-Helper AI coding and architecture skill and scripts for Semantic Web agent and ontology engineering architecture using principles of Expert systems, Linked Data, and World Wide Web architecture.
+Agent scaffolding that use principles of Expert systems, Linked Data, ontology engineering, and World Wide Web architecture
 
 Provides two (OpenCode-compatible) Agent skills, plus a medical reasoning [subagent](https://opencode.ai/docs/agents/) and
 [command](https://opencode.ai/docs/commands) for delegating clinical terminology questions to a terminology specialist model instead of reasoning about unfamiliar medical terms directly.
 
 Is opinionated in which tools to use ([OWL_DSL](https://github.com/chimezie/owl_dsl), [ROBOT](https://robot.obolibrary.org/), [Fuxi-reincarnate](https://github.com/chimezie/fuxi-reincarnate), [riot](https://jena.apache.org/documentation/io/)) but provides a comprehensive Semantic Web architecture toolkit.
 
+## Installation
+
+Run the installer from the repository root. It installs the skills for OpenCode, Claude Code, or both; the default is `--target all --scope user`.
+
+| Goal | Command |
+| --- | --- |
+| OpenCode only | `tools/setup.sh --target opencode` |
+| Claude Code only | `tools/setup.sh --target claude` |
+| Both agents | `tools/setup.sh --target all` |
+| Project scope | `tools/setup.sh --target all --scope project --project-dir /path/to/project` |
+| Development (`--link`) | `tools/setup.sh --target opencode --link` |
+| Claude Code agent and command | `tools/setup.sh --target claude --with-agents` |
+| Uninstall | `tools/setup.sh --uninstall --target all` (add `--with-agents` to also remove unchanged generated Claude files) |
+
+Preview any run with `--dry-run`; replace installs this script did not create with `--force`.
+
+The OpenCode `medical-concept` agent needs a model. Pass `--opencode-model provider/model`, let the installer prompt on a terminal, or edit the installed agent; without a value it uses OpenCode's default model. Example: `tools/setup.sh --target opencode --opencode-model myprovider/my-model`. Add `--claude-model sonnet` (or a full ID) when generating the Claude agent.
+
+The `semantic-web-agent` skill also uses tools such as `ontology-report`, `verbalize-ontology-class`, and `check-ontology` that come from [OWL_DSL](https://github.com/chimezie/owl_dsl). Install OWL_DSL separately; this repository bundles only the helper scripts under `skills/semantic-web-agent/scripts/`.
+
 ## Skills
 
 ### 1. [`semantic-web-agent`](skills/semantic-web-agent/SKILL.md)
 
-Handles RDF, OWL, N3, RIF, and SPARQL including entailment regimes. Applies expert system principles and semantic web standards, generates reasoning proofs, and validates ontologies.
+Handles RDF, OWL, N3, RIF, and SPARQL including entailment regimes. Applies expert system principles to semantic web standards.
 
 * Semantic Web as extension of Web of Data with logic-based Knowledge Representation; Preference for declarative linked data with resolvable URIs.
 * Workflows ([`references/workflows.md`](skills/semantic-web-agent/references/workflows.md)):
@@ -29,7 +49,7 @@ Handles RDF, OWL, N3, RIF, and SPARQL including entailment regimes. Applies expe
 
 ### 2. [`ontology-engineering`](skills/ontology-engineering/SKILL.md)
 
-Normalizes OWL 2 ontologies via Rector normalisation, BFO alignment, and RO reuse. Builds skeleton trees, `EquivalentTo` definitions, disjointness/covering, EL++-safe hierarchies.
+Normalizes OWL 2 ontologies via Rector normalisation, BFO alignment (for biomedical ontologies).
 
 * Distinguish **ontological placement** (BFO: continuant/occurrent, independent/dependent) from **implementation normalisation** (primitive vs defined).
 * Rector recipe: compositional classes via primitive skeleton trees (single primitive parent, homogeneous subsumption), `EquivalentTo` with existential restrictions (Manchester: `Fracture and (has_location some Femur)`), RO reuse, sibling disjointness, reason, and verify.
@@ -42,9 +62,7 @@ Normalizes OWL 2 ontologies via Rector normalisation, BFO alignment, and RO reus
 
 ## Medical reasoning subagent and command
 
-New supporting pair for use with medical reasoning language models:
+For use with medical reasoning language models:
 
 * [`agents/medical-concept.md`](agents/medical-concept.md) (`medical-concept` subagent, `temperature: 0.2`, `edit/bash/task: deny`): clinical terminology and coding-system specialist with built-in expertise in ICD-10-CM, FMA, PDGM, OASIS, NANDA-I, and SNOMED CT. Returns short conversational answers with standard definitions only, ICD-10-CM name if defined there, owning terminology system, and synonyms. Delegate terminology disambiguation, coding-system mapping, and clinical semantics questions to it.
 * [`commands/ask-medical.md`](commands/ask-medical.md) (`/ask-medical`, `agent: medical-concept`, `subtask: true`): thin wrapper that forwards `$ARGUMENTS` to the subagent.
-
-See also: [`Defining_a_Medical-Terminology_Subagent_via_an_OpenCode.md`](Defining_a_Medical-Terminology_Subagent_via_an_OpenCode.md)
