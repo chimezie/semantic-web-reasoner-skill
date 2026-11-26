@@ -1,0 +1,20 @@
+# Editor / IDE
+.idea/
+
+# Build and dependency output
+dist/
+node_modules/
+
+# Python environment and caches
+.venv/
+__pycache__/
+.ruff_cache/
+
+# Local working files (not part of the skills)
+archive/
+plans/
+research_notes/
+reports/
+
+# Local Claude Code settings
+.claude/settings.local.json
