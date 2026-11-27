@@ -47,14 +47,17 @@ Options:
       --target TARGET    opencode, claude, or all (default: all)
       --scope SCOPE      user or project (default: user)
       --project-dir DIR  Project directory for --scope project (default: cwd)
-      --link             Symlink skills from this repository instead of copying
+      --link             Developer mode: symlink skills from this repository
+                         instead of copying (breaks if the repository moves)
       --force            Replace destination entries this script did not install
       --with-agents      Generate Claude Code agent and command files
       --opencode-model V Model for the OpenCode medical-concept agent
                          (provider/model); prompts on a terminal
       --claude-model V   Model for the generated Claude agent (e.g. sonnet)
-      --uninstall        Remove this script's skills and symlinks; with
-                         --with-agents, also remove unchanged Claude files
+      --uninstall        Remove this script's skills and symlinks, plus the
+                         OpenCode tools, agent and command it installed if
+                         unchanged; with --with-agents, also the generated
+                         Claude files
 
 Positional SKILL arguments limit the install to the named skills. With no
 positional arguments, every skills/*/SKILL.md is installed.
@@ -383,8 +386,8 @@ validate_skill() {
         if (( ${#name} > 64 )); then
             errors+=("name exceeds 64 characters")
         fi
-        if [[ ! "$name" =~ ^[a-z0-9-]+$ ]]; then
-            errors+=("name must match ^[a-z0-9-]+$")
+        if [[ ! "$name" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+            errors+=("name must be lowercase letters, digits and single hyphens, with no leading or trailing hyphen")
         fi
         if [[ "$name" == *claude* || "$name" == *anthropic* ]]; then
             errors+=("name must not contain 'claude' or 'anthropic'")
@@ -433,7 +436,7 @@ validate_skill() {
         case "$target" in
             http://*|https://*|mailto:*|/*) continue ;;
         esac
-        if [[ ! -e "${skill_dir}/${target}" ]]; then
+        if [[ ! -f "${skill_dir}/${target}" ]]; then
             errors+=("broken relative link: $target")
         fi
     done < <(grep -oE '\]\([^)]+\)' "$skill_md" || true)
@@ -486,15 +489,15 @@ build_bundle() {
     local sub
 
     mkdir -p "$dest"
-    cp -- "$src/SKILL.md" "$dest/SKILL.md"
+    cp -- "$src/SKILL.md" "$dest/SKILL.md" || return 1
 
     for sub in references scripts assets; do
         if [[ -d "$src/$sub" ]]; then
-            copy_tree "$src/$sub" "$dest/$sub"
+            copy_tree "$src/$sub" "$dest/$sub" || return 1
         fi
     done
 
-    prune_bundle "$dest"
+    prune_bundle "$dest" || return 1
 }
 
 install_skill_copy() {
@@ -526,15 +529,17 @@ install_skill_copy() {
         return 0
     fi
 
-    tmp="$(mktemp -d "${TMPDIR:-/tmp}/swrs-skill.XXXXXX")"
+    # Stage inside the destination root so the final mv is a same-filesystem rename.
+    mkdir -p "$root"
+    tmp="$(mktemp -d "${root}/.swrs-stage.XXXXXX")"
     built="${tmp}/${skill}"
     if ! build_bundle "$src" "$built"; then
         rm -rf -- "$tmp"
         log_error "Failed to build bundle for '$skill'"
-        return 1
+        FAILED=true
+        return 0
     fi
 
-    mkdir -p "$root"
     if [[ -e "$dest" || -L "$dest" ]]; then
         remove_entry "$dest"
     fi
@@ -551,7 +556,7 @@ install_skill_link() {
     local dest="${root}/${skill}"
 
     if [[ -e "$dest" || -L "$dest" ]]; then
-        if is_our_symlink "$dest"; then
+        if is_our_install "$dest"; then
             :
         elif [[ "$FORCE" == true ]]; then
             if [[ "$DRY_RUN" == true ]]; then
@@ -561,7 +566,7 @@ install_skill_link() {
                 remove_entry "$dest"
             fi
         else
-            log_warn "Skipping $dest: not a symlink into this repository (use --force to replace)"
+            log_warn "Skipping $dest: not installed by this script (use --force to replace)"
             return 0
         fi
     fi
@@ -573,7 +578,7 @@ install_skill_link() {
 
     mkdir -p "$root"
     if [[ -e "$dest" || -L "$dest" ]]; then
-        rm -f -- "$dest"
+        remove_entry "$dest"
     fi
     ln -s -- "$src" "$dest"
     log_info "Linked skill: $dest -> $src"
@@ -619,9 +624,83 @@ uninstall_skill() {
     log_warn "Skipping $dest: not installed by this script"
 }
 
-copy_file() {
-    local src="$1"
-    local dest="$2"
+file_hash() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum -- "$1" | awk '{print $1}'
+    else
+        shasum -a 256 -- "$1" | awk '{print $1}'
+    fi
+}
+
+# The tools manifest records "<sha256>TAB<path relative to the tools dir>" for every
+# file this script copied there, so later runs can tell "ours and unchanged" (safe to
+# update or remove) from "yours" (left alone unless --force).
+tools_manifest() {
+    printf '%s/%s' "$OPENCODE_TOOLS_DIR" "$MARKER"
+}
+
+manifest_get() {
+    local manifest
+    manifest="$(tools_manifest)"
+    [[ -f "$manifest" ]] || return 0
+    awk -F'\t' -v rel="$1" '$2 == rel { print $1; exit }' "$manifest"
+}
+
+manifest_drop() {
+    local manifest tmp
+    manifest="$(tools_manifest)"
+    [[ -f "$manifest" ]] || return 0
+    tmp="$(mktemp "${OPENCODE_TOOLS_DIR}/.swrs-manifest.XXXXXX")"
+    awk -F'\t' -v rel="$1" '$2 != rel' "$manifest" > "$tmp"
+    if [[ -s "$tmp" ]]; then
+        mv -- "$tmp" "$manifest"
+    else
+        rm -f -- "$tmp" "$manifest"
+    fi
+}
+
+manifest_set() {
+    local rel="$1" hash="$2" manifest tmp
+    manifest="$(tools_manifest)"
+    mkdir -p "$OPENCODE_TOOLS_DIR"
+    tmp="$(mktemp "${OPENCODE_TOOLS_DIR}/.swrs-manifest.XXXXXX")"
+    if [[ -f "$manifest" ]]; then
+        awk -F'\t' -v rel="$rel" '$2 != rel' "$manifest" > "$tmp"
+    fi
+    printf '%s\t%s\n' "$hash" "$rel" >> "$tmp"
+    mv -- "$tmp" "$manifest"
+}
+
+install_tool_file() {
+    local src="$1" rel="$2"
+    local dest="${OPENCODE_TOOLS_DIR}/${rel}"
+    local new_hash cur_hash="" rec_hash
+
+    new_hash="$(file_hash "$src")"
+
+    if [[ -e "$dest" || -L "$dest" ]]; then
+        if [[ -f "$dest" && ! -L "$dest" ]]; then
+            cur_hash="$(file_hash "$dest")"
+        fi
+        if [[ "$cur_hash" == "$new_hash" ]]; then
+            [[ "$DRY_RUN" == true ]] || manifest_set "$rel" "$new_hash"
+            if [[ "$VERBOSE" == true ]]; then
+                log_info "Up to date: $dest"
+            fi
+            return 0
+        fi
+        rec_hash="$(manifest_get "$rel")"
+        if [[ -n "$rec_hash" && "$cur_hash" == "$rec_hash" ]]; then
+            : # installed by this script and unchanged since: safe to update
+        elif [[ "$FORCE" == true ]]; then
+            if [[ "$DRY_RUN" == false ]]; then
+                log_warn "Replacing file not installed by this script (--force): $dest"
+            fi
+        else
+            log_warn "Skipping $dest: not installed by this script, or changed since (use --force to replace)"
+            return 0
+        fi
+    fi
 
     if [[ "$DRY_RUN" == true ]]; then
         log_dry "Would copy: $src -> $dest"
@@ -631,22 +710,23 @@ copy_file() {
     if [[ "$VERBOSE" == true ]]; then
         log_info "Copying: $src -> $dest"
     fi
-
     mkdir -p "$(dirname -- "$dest")"
+    if [[ -L "$dest" ]]; then
+        rm -f -- "$dest"
+    fi
     cp -- "$src" "$dest"
+    manifest_set "$rel" "$new_hash"
 }
 
-copy_dir() {
-    local src="$1"
-    local dest="$2"
-
-    if [[ "$DRY_RUN" == true ]]; then
-        log_dry "Would copy: $src/ -> $dest/"
-        return 0
-    fi
-
-    mkdir -p "$dest"
-    copy_tree "$src" "$dest"
+read_model_value() {
+    awk '
+        /^model:[[:space:]]*/ {
+            sub(/^model:[[:space:]]*/, "", $0)
+            sub(/[[:space:]]+$/, "", $0)
+            print
+            exit
+        }
+    ' "$1"
 }
 
 resolve_opencode_model() {
@@ -658,14 +738,7 @@ resolve_opencode_model() {
         value="$OPENCODE_MODEL"
         branch="flag"
     elif [[ -f "$dest" ]]; then
-        value="$(awk '
-            /^model:[[:space:]]*/ {
-                sub(/^model:[[:space:]]*/, "", $0)
-                sub(/[[:space:]]+$/, "", $0)
-                print
-                exit
-            }
-        ' "$dest")"
+        value="$(read_model_value "$dest")"
         if [[ -n "$value" ]]; then
             branch="installed"
         fi
@@ -711,18 +784,19 @@ install_opencode_extras() {
         [[ -d "$scripts_dir" ]] || continue
         for script_file in "$scripts_dir"/*.py; do
             [[ -f "$script_file" ]] || continue
-            copy_file "$script_file" "${OPENCODE_TOOLS_DIR}/$(basename -- "$script_file")"
+            install_tool_file "$script_file" "$(basename -- "$script_file")"
         done
     done
 
     for ts_file in "$PROJECT_ROOT"/src/*.ts; do
         [[ -f "$ts_file" ]] || continue
-        copy_file "$ts_file" "${OPENCODE_TOOLS_DIR}/$(basename -- "$ts_file")"
+        install_tool_file "$ts_file" "$(basename -- "$ts_file")"
     done
 
-    if [[ -d "$PROJECT_ROOT/src/lib" ]]; then
-        copy_dir "$PROJECT_ROOT/src/lib" "${OPENCODE_TOOLS_DIR}/lib"
-    fi
+    for ts_file in "$PROJECT_ROOT"/src/lib/*; do
+        [[ -f "$ts_file" ]] || continue
+        install_tool_file "$ts_file" "lib/$(basename -- "$ts_file")"
+    done
 
     if [[ -f "$PROJECT_ROOT/agents/medical-concept.md" ]]; then
         agent_dest="${OPENCODE_CONFIG_DIR}/agents/medical-concept.md"
@@ -900,14 +974,7 @@ uninstall_claude_extras() {
     agent_dest="${CLAUDE_AGENTS_DIR}/medical-concept.md"
     model="$CLAUDE_MODEL"
     if [[ -z "$model" && -f "$agent_dest" ]]; then
-        model="$(awk '
-            /^model:[[:space:]]*/ {
-                sub(/^model:[[:space:]]*/, "", $0)
-                sub(/[[:space:]]+$/, "", $0)
-                print
-                exit
-            }
-        ' "$agent_dest")"
+        model="$(read_model_value "$agent_dest")"
     fi
 
     tmp="$(mktemp -d "${TMPDIR:-/tmp}/swrs-claude.XXXXXX")"
@@ -917,6 +984,73 @@ uninstall_claude_extras() {
     uninstall_generated_file "${tmp}/ask-medical.md" "${CLAUDE_COMMANDS_DIR}/ask-medical.md"
 
     rm -rf -- "$tmp"
+}
+
+uninstall_opencode_extras() {
+    log_info "Removing OpenCode tool, agent, and command files installed by this script"
+
+    local manifest rec_hash rel dest cur_hash tmp agent_dest model src_file
+
+    manifest="$(tools_manifest)"
+    if [[ -f "$manifest" ]]; then
+        while IFS=$'\t' read -r rec_hash rel; do
+            [[ -n "$rel" ]] || continue
+            dest="${OPENCODE_TOOLS_DIR}/${rel}"
+            if [[ ! -e "$dest" && ! -L "$dest" ]]; then
+                [[ "$DRY_RUN" == true ]] || manifest_drop "$rel"
+                continue
+            fi
+            cur_hash=""
+            if [[ -f "$dest" && ! -L "$dest" ]]; then
+                cur_hash="$(file_hash "$dest")"
+            fi
+            if [[ "$cur_hash" != "$rec_hash" ]]; then
+                log_warn "Skipping $dest: changed since this script installed it"
+            elif [[ "$DRY_RUN" == true ]]; then
+                log_dry "Would remove: $dest"
+            else
+                rm -f -- "$dest"
+                manifest_drop "$rel"
+                log_info "Removed: $dest"
+            fi
+        done < "$manifest"
+        if [[ "$DRY_RUN" == false ]]; then
+            rmdir "${OPENCODE_TOOLS_DIR}/lib" 2>/dev/null || true
+        fi
+    elif [[ "$VERBOSE" == true ]]; then
+        log_info "No tools manifest at $manifest; nothing to remove from ${OPENCODE_TOOLS_DIR}"
+    fi
+
+    tmp="$(mktemp -d "${TMPDIR:-/tmp}/swrs-opencode.XXXXXX")"
+
+    if [[ -f "$PROJECT_ROOT/agents/medical-concept.md" ]]; then
+        agent_dest="${OPENCODE_CONFIG_DIR}/agents/medical-concept.md"
+        model=""
+        if [[ -f "$agent_dest" ]]; then
+            model="$(read_model_value "$agent_dest")"
+        fi
+        generate_opencode_agent "${tmp}/medical-concept.md" "$model"
+        uninstall_generated_file "${tmp}/medical-concept.md" "$agent_dest"
+    fi
+
+    for src_file in "$PROJECT_ROOT"/agents/*.md; do
+        [[ -f "$src_file" ]] || continue
+        [[ "$(basename -- "$src_file")" == "medical-concept.md" ]] && continue
+        uninstall_generated_file "$src_file" "${OPENCODE_CONFIG_DIR}/agents/$(basename -- "$src_file")"
+    done
+
+    for src_file in "$PROJECT_ROOT"/commands/*.md; do
+        [[ -f "$src_file" ]] || continue
+        uninstall_generated_file "$src_file" "${OPENCODE_CONFIG_DIR}/commands/$(basename -- "$src_file")"
+    done
+
+    rm -rf -- "$tmp"
+}
+
+check_prerequisites() {
+    if [[ "$UNINSTALL" == false ]] && ! command -v uv >/dev/null 2>&1; then
+        log_warn "uv was not found on PATH. The bundled helper scripts declare their dependencies inline (PEP 723) and are meant to be run with 'uv run'. Install uv (https://docs.astral.sh/uv/), or install rdflib and fuxi yourself and run the scripts with python3."
+    fi
 }
 
 main() {
@@ -943,6 +1077,8 @@ main() {
         log_info "Running in dry-run mode (no changes will be made)"
     fi
 
+    check_prerequisites
+
     local skill root
     for skill in "${SELECTED_SKILLS[@]}"; do
         if [[ "$UNINSTALL" == true ]]; then
@@ -967,6 +1103,9 @@ main() {
     done
 
     if [[ "$UNINSTALL" == true ]]; then
+        if has_target opencode && [[ "$SCOPE" == "user" ]]; then
+            uninstall_opencode_extras
+        fi
         if has_target claude && [[ "$WITH_AGENTS" == true ]]; then
             uninstall_claude_extras
         fi

@@ -1,8 +1,8 @@
 # Semantic Web Agent and Ontology Management Skills
 
-Agent scaffolding that use principles of Expert systems, Linked Data, ontology engineering, and World Wide Web architecture
+Agent scaffolding that uses principles of Expert systems, Linked Data, ontology engineering, and World Wide Web architecture
 
-Provides two (OpenCode-compatible) Agent skills, plus a medical reasoning [subagent](https://opencode.ai/docs/agents/) and
+Provides two Agent Skills for OpenCode and Claude Code, plus a medical reasoning [subagent](https://opencode.ai/docs/agents/) and
 [command](https://opencode.ai/docs/commands) for delegating clinical terminology questions to a terminology specialist model instead of reasoning about unfamiliar medical terms directly.
 
 Is opinionated in which tools to use ([OWL_DSL](https://github.com/chimezie/owl_dsl), [ROBOT](https://robot.obolibrary.org/), [Fuxi-reincarnate](https://github.com/chimezie/fuxi-reincarnate), [riot](https://jena.apache.org/documentation/io/)) but provides a comprehensive Semantic Web architecture toolkit.
@@ -22,6 +22,12 @@ Run the installer from the repository root. It installs the skills for OpenCode,
 | Uninstall | `tools/setup.sh --uninstall --target all` (add `--with-agents` to also remove unchanged generated Claude files) |
 
 Preview any run with `--dry-run`; replace installs this script did not create with `--force`.
+
+**Prerequisites.** Bash, plus [uv](https://docs.astral.sh/uv/) to run the bundled helper scripts. The installer warns if `uv` is missing; without it, install `rdflib` and `fuxi` yourself and run the scripts with `python3`.
+
+**Choosing a target.** OpenCode's docs list `~/.claude/skills` among the directories it reads, so `--target claude` alone may serve both agents. `--target all` installs a separate copy for each, and on OpenCode 2.x its own copy takes precedence over the Claude one, so re-run the installer rather than editing one copy by hand. Restart OpenCode (or start a new Claude Code session) after installing so the skills are rediscovered.
+
+**What the installer will not overwrite.** Skill directories carry a marker file and the OpenCode helper scripts and wrappers (copied to `~/.opencode/tools`) are tracked in a manifest in that directory. Anything the script did not install, or that you edited afterwards, is skipped with a warning unless you pass `--force`. The `--uninstall` option only removes what has not been changed. Check that the tools appear after installing.
 
 The OpenCode `medical-concept` agent needs a model. Pass `--opencode-model provider/model`, let the installer prompt on a terminal, or edit the installed agent; without a value it uses OpenCode's default model. Example: `tools/setup.sh --target opencode --opencode-model myprovider/my-model`. Add `--claude-model sonnet` (or a full ID) when generating the Claude agent.
 
