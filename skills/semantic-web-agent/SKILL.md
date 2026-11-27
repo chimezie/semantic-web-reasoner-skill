@@ -7,6 +7,10 @@ description: >-
   over, annotate, or validate an ontology, even if the user does not say
   "semantic web". Applies semantic web standards, generates reasoning proofs,
   and validates ontologies.
+compatibility: >-
+  Bundled helper scripts run with uv (PEP 723 inline dependencies, Python 3.11+;
+  rdflib, plus fuxi for sparql-interlocution). Tools such as ontology-report and
+  check-ontology come from OWL_DSL and must be installed separately.
 ---
 
 # Semantic Web Agent
@@ -22,7 +26,7 @@ Prefer declarative linked data:
 - **Cool URIs**: Prefer stable, mnemonic URIs. Use hash URIs (`#`) with 303 redirects for large-scale instance data.
 - **Linking**: Connect resources via authoritative links (e.g., `rdfs:isDefinedBy`, `foaf:page`) so agents can follow their nose.
 
-For ontologies in ontologverbose exchange formats such as RDF/XML, do not read text with `grep`; use the inspection tools to understand structure. 
+For ontologies in verbose exchange formats such as RDF/XML, do not read text with `grep`; use the inspection tools to understand structure.
 
 ## Tool access
 
@@ -61,6 +65,17 @@ uv run scripts/get-annotation.py \
   Disease \
   true \
   skos:prefLabel
+```
+
+Run `sparql-interlocution` with the endpoint URL, a namespace prefix map, the query, and the local TBox file:
+
+```bash
+uv run scripts/sparql-interlocution.py \
+  "https://dbpedia.org/sparql" \
+  '{"dbo": "http://dbpedia.org/ontology/"}' \
+  'SELECT ?s WHERE { ?s a dbo:Person } LIMIT 10' \
+  ontology.owl \
+
 ```
 
 `uv` reads each script's inline dependencies. Without `uv`, install `rdflib` (and `fuxi` for `sparql-interlocution`) and run the scripts with `python3`.
