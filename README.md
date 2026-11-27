@@ -7,6 +7,8 @@ Provides two Agent Skills for OpenCode and Claude Code, plus a medical reasoning
 
 Is opinionated in which tools to use ([OWL_DSL](https://github.com/chimezie/owl_dsl), [ROBOT](https://robot.obolibrary.org/), [Fuxi-reincarnate](https://github.com/chimezie/fuxi-reincarnate), [riot](https://jena.apache.org/documentation/io/)) but provides a comprehensive Semantic Web architecture toolkit.
 
+<img src="Coding_Agent_Architecture_Infographic.png" alt="Overview of skills"/>
+
 ## Installation
 
 Run the installer from the repository root. It installs the skills for OpenCode, Claude Code, or both; the default is `--target all --scope user`.
